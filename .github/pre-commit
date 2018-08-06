@@ -1,0 +1,17 @@
+#!/bin/sh
+
+# Make lints before commit made.
+# To use it:
+#
+#     cd /where/is/gogo
+#     ln -s $PWD/.github/pre-commit .git/hooks/pre-commit
+#
+LINT_DIRS= "gogo|example|test"
+FILENAMES=$(git diff --name-only --cached --diff-filter=ACMRTUXB | ack "^(($LINT_DIRS)(?=/).)?.*\.py$")
+
+if [ ! -z "$FILENAMES" ]
+then
+  flake8 $FILENAMES
+fi
+
+

@@ -6,7 +6,6 @@ CORE_STATIC_PATH = os.path.join(os.path.dirname(__file__), 'static')
 
 # config
 APP_CONFIG_PATH = 'app.yaml'
-CORE_CONFIG_PATH = 'env.yaml'
 GOGO_APP_NAME_PREFIX = 'gogo.'
 ENV_VOS_PATH = 'gogo.vos.env'
 

@@ -4,6 +4,8 @@ import time
 
 import functools
 
+import six
+
 from gogo.ctx import g
 # TODO(vici) db session manager for mongo
 # TODO(vici) config module
@@ -100,3 +102,15 @@ class Service(dict):
         self.__processors = []
         for proc_cls in self.REQUESTED_PROCESSORS:
             self.__processors.append(proc_cls(self))
+
+    def register(self, dispatcher):
+        self.grpc_service_dispatcher_cls = dispatcher
+
+
+def DispatcherMata(type):
+    # TODO(vici) add error handler, event, log, ctx handler.
+    pass
+
+
+def dispatcher_with_meta(grpc_base):
+    return six.with_metaclass(DispatcherMata, grpc_base)

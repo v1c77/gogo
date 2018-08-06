@@ -8,8 +8,8 @@ import logging
 import sys
 import grpc
 
-from excemple.gogo_excmple import hello_bro_pb2
-from excemple.gogo_excmple import hello_bro_pb2_grpc
+from example import hello_bro_pb2
+from example import hello_bro_pb2_grpc
 
 
 root = logging.getLogger()
