@@ -4,9 +4,9 @@ python:
 
 install:
   - pip install -r requirements_2.txt
-  - pip install -r dev_requirements.txt
 before_script:
-  echo "gogo"
+  echo "**********before gogo test************"
+  pip list
 
 script:
   - |
