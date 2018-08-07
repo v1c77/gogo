@@ -1,0 +1,22 @@
+language: python
+python:
+- '2.7'
+
+install:
+  - pip install -r requirements_2.txt
+  - pip install -r dev_requirements.txt
+before_script:
+  echo "gogo"
+
+script:
+  - |
+    set -ex
+    TOX_PY="py${TRAVIS_PYTHON_VERSION/./}"
+    tox
+    set +x
+
+notifications:
+  email: false
+
+after_success:
+  - codecov

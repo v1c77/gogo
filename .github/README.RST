@@ -12,3 +12,7 @@ so even though grpc is write in c, and the serve and complete_queue is in
 
 all in draft....
 
+
+to dev it:
+
+    pip install --editable .
