@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 import time
-import six
-from concurrent import futures
 
 from gogo.service import Service, dispatcher_with_meta
 from example.hello_bro_pb2_grpc import BroServicer
@@ -36,7 +34,10 @@ def handler_hello():
 
 
 # TODO(vici)
+# I need a meta with hello_bro_pb2_grpc
+
 class Dispatcher(dispatcher_with_meta(BroServicer)):
+
     """the DispatcherMixin will handle error."""
 
     def SayHello(self, request, context):

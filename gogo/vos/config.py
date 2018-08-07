@@ -7,8 +7,14 @@ gogo.vos.config
 Used to load grpc server config.
 """
 import logging
-from gogo.consts import REGISTRY_ENABLED
-from gogo.vos.consts import ENV_DEV, SYSLOG_SOCKET
+import sys
+
+import yaml
+
+from gogo.consts import REGISTRY_ENABLED, APP_CONFIG_PATH
+from gogo.exc import AppConfigLoadFailException
+from gogo.utils import EnvvarReader, cached_property
+from gogo.vos.consts import ENV_DEV, SYSLOG_SOCKET, DEFAULT_APP_PORT
 from gogo.vos.loader import build_env_loader
 
 logger = logging.getLogger(__name__)
@@ -97,14 +103,56 @@ def load_core_config(raise_exc=False):
 app_config = None
 
 
-class BareAppConfig(object):
-    # TODO(vici) a lot things to do. before load core_config
-    raise NotImplementedError
+class AppConfig(object):
+    """Application related configs, as a yaml file at
+    `APP_CONFIG_PATH`, e.g.:
+
+        app_name: ves.note
+        settings: note.settings
+        services:
+          app: note.service:service
+          thrift_file: note/note.thrift
+          requirements: thrift_requirements.txt
+    """
+    DEFAULT_APP_PORT = DEFAULT_APP_PORT
+
+    def __init__(self):
+        self.config = None
+        self.etrace_enabled = False
+        self.api_ops_metrics_enabled = False
+        self.ves_stats_enabled = False
+
+    def load(self, config_path=APP_CONFIG_PATH, raise_exc=False):
+        try:
+            self.config = yaml.load(open(config_path))
+        except (IOError, yaml.error.YAMLError):
+            if raise_exc is True:
+                raise AppConfigLoadFailException
+            logger.error('Connot load %s, exit.', config_path)
+            sys.exit(1)
+        return self
+
+    def _get_conf(self, key, default=None):
+        """Help to try config first on key 'services' and then root.
+        """
+        if 'services' in self.config:
+            return self.config['services'].get(key, default)
+        return self.config.get(key, default)
+
+    @cached_property
+    def app_uri(self):
+        app = self._get_conf('app', None)
+        if app is None:
+            raise RuntimeError("Missing `app` in app.yaml. ")
+        return app
+
+    def get_grpc_module(self):
+        pass
 
 
-class GrpcAppConfig(BareAppConfig):
-    # TODO(vici) a lot things to do. before load core_config
-    raise NotImplementedError
+class GrpcAppConfig(AppConfig):
+    TYPE_NAME = 'grpc'
+    DEFAULT_APP_PORT = DEFAULT_APP_PORT
 
 
 def load_app_config():
@@ -114,10 +162,9 @@ def load_app_config():
     """
     global app_config
     if app_config is None:
-        from . import env
-
-        if env.is_grpc_app():
-            app_config = GrpcAppConfig().load(raise_exc=raise_exc)
+        # from . import env
+        # if env.is_grpc_app():
+        app_config = GrpcAppConfig().load(raise_exc=raise_exc)
     return app_config
 
 

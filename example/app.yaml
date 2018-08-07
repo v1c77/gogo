@@ -1,0 +1,4 @@
+app_name: settings
+settings: gogo_settings
+services:
+  app: gogo_server:service
