@@ -12,12 +12,6 @@ with open('gogo/__init__.py', 'rb') as f:
         f.read().decode('utf-8')).group(1)))
 
 
-def _get_requirements():
-    requirement_file = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                    'requirements_2.txt')
-    return open(requirement_file).readlines()
-
-
 setup(
     name='gogo',
     version=version,
@@ -30,7 +24,20 @@ setup(
     packages=['gogo'],
     zip_safe=False,
     platforms='any',
-    install_requires=_get_requirements(),
+    install_requires=[
+        'futures>=3.2.0',
+        'Geohash==1.0',
+        'google-api-python-client>=1.7.4',
+        'google-auth>=1.5.0',
+        'google-auth-httplib2>=0.0.3',
+        'grpcio>=1.14.0',
+        'grpcio-tools>=1.14.0',
+        'ipython==5.7.0',
+        'ipython-genutils==0.2.0',
+        'protobuf>=3.6.0',
+        'pymongo>=3.7.1',
+        'six>=1.11.0',
+    ],
     classifiers=[
         'Development Status :: 1 - Planning',  # fixme change when needed.
         'Intended Audience :: Developers',
