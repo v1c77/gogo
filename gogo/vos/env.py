@@ -24,4 +24,4 @@ def is_in_shell():
 
 
 def is_grpc_app():
-
+    pass

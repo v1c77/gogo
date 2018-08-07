@@ -7,3 +7,6 @@ ENV_SHELL = 'SHELL'
 
 # syslog socket, no journald distribution
 SYSLOG_SOCKET = "/run/systemd/journal/syslog"
+
+# grpc conf
+DEFAULT_APP_PORT = 8010

@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
 """
-momo.utils
-~~~~~~~~~~~~~~~
+gogo.utils
+~~~~~~~~~~
 
 This module provides common utils, as a standalone util module,
 it shouldn't import any other modules from package
@@ -19,25 +19,20 @@ import click
 import decimal
 import datetime
 import numbers
-import geohash
 import random
 import string
 import inspect
 import urlparse
 import subprocess
-
-import sqlalchemy as sa
+import geohash
+import importlib
 
 from types import StringTypes
-from collections import defaultdict
-from thriftpy.thrift import TType
-from pymysql.converters import convert_datetime
-from gunicorn_thrift.utils import load_obj as origial_load_obj
-
-from .consts import TO_SHIED_COMMON_PARAMETERS
 
 
 # used for mobile verify
+from gunicorn.errors import AppImportError
+
 MOBILE_RE = re.compile('^1\d{10}$')
 ALL_PHONE_RE = re.compile('^1\d{10}$|^[2-9]\d{6,7}(-\d{1,4})?$'
                           '|^6[1-9]{2,5}$')
@@ -54,14 +49,6 @@ TServerTimeoutSentryProject = None
 
 LIB_DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 
-TYPE_MAP = {
-    TType.BOOL: bool,
-    TType.DOUBLE: float,
-    TType.I16: (int, long),
-    TType.I32: (int, long),
-    TType.I64: (int, long),
-    TType.STRING: (str, unicode),
-}
 
 DEPRECATION_PATTERN = 'option %r is deprecating, please use %r instead'
 
@@ -164,74 +151,6 @@ def get_unique_string(length=31):
         return full[:length]
     else:
         return full
-
-
-def _serialize(obj, tobj, fields=None, excluded=()):
-    fields = fields or tobj.__dict__
-    types = {item[1]: TYPE_MAP[item[0]] for item in tobj.thrift_spec.values()
-             if item[0] in TYPE_MAP}
-
-    for k in fields:
-        if k in excluded:
-            continue
-
-        if hasattr(obj, "_cached_property"):
-            obj._cached_property = {}
-
-        attr = getattr(obj, k)
-
-        if hasattr(obj, "__table__"):
-            column = obj.__table__.columns.get(k)
-
-            if column is not None and attr is None and \
-                    column.default is not None and \
-                    column.default.is_scalar:
-                attr = column.default.arg
-
-            if column is not None and \
-                    isinstance(attr, (str, unicode)) and \
-                    isinstance(column.type, (sa.DateTime, sa.Date)):
-                attr = convert_datetime(attr)
-
-        if isinstance(attr, datetime.datetime):
-            attr = datetime2utc(attr)
-        elif isinstance(attr, decimal.Decimal):
-            attr = float(attr)
-        elif isinstance(attr, (datetime.date, datetime.time)):
-            attr = unicode(attr)
-        elif attr and k in types and not isinstance(attr, types[k]):
-            _t = types[k]
-            if isinstance(_t, tuple):
-                _t = _t[0]
-            attr = _t(attr)
-
-        setattr(tobj, k, attr)
-
-
-def serialize_with_excluded(obj, ttype=None, excluded=()):
-    """
-    :param obj: sqlalchemy model instance to be serialized
-    ``__thrift__`` class attribute in the model is assumed
-    :param ttype: Thrift struct type, must provide if ``obj`` has
-    no ``__thrift__`` attribute
-    :param excluded: fields which would not serialize from obj and just
-     set to be None as for thrift's strict type
-    :return: serialized result
-    """
-    if hasattr(obj, '__thrift__'):
-        tobj = obj.__thrift__()
-    else:
-        tobj = ttype()
-
-    fields = tobj.__dict__
-    _serialize(obj, tobj, fields, excluded=excluded)
-    return tobj
-
-
-def serialize_to_ttype(obj, ttype, fields=None):
-    tobj = ttype()
-    _serialize(obj, tobj, fields)
-    return tobj
 
 
 def geo_point_to_geo_hash(latitude, longitude):
@@ -482,22 +401,6 @@ class StrictVersion(Version):
             return compare  # prerelease stuff doesn't matter
 
 
-def filter_apis_to_shield(grpc, service_name):
-    '''
-    get the offset of parameter whose name containe 'password'
-    '''
-    apis_to_shield = defaultdict(set)
-    service = getattr(grpc, service_name)
-    for api in service.grpc_services:
-        grpc_spec = getattr((getattr(service, api + "_args", None)),
-                              "grpc_spec", dict())
-        for offset, argu_name in grpc_spec.iteritems():
-            for api_name_seg in TO_SHIED_COMMON_PARAMETERS:
-                if api_name_seg in argu_name[1]:
-                    apis_to_shield[api].add(offset - 1)
-    return apis_to_shield
-
-
 class EmptyValue(object):
     """represent a value that is empty, see :meth:`is_empty` to see what
     empty means here
@@ -620,20 +523,6 @@ class SpacedKeyValueDict(click.ParamType):
 clickparams.SPACED_DICT = SpacedKeyValueDict()
 
 
-def load_obj(import_path):
-    """ lood obj by python path string. Add paramter check """
-    if not import_path:
-        return None
-    return origial_load_obj(import_path)
-
-
-def sqlalchemy_init_new_pool(session):
-    if callable(session):
-        session = session()
-    for e in session.engines.itervalues():
-        e.pool = e.pool.recreate()
-
-
 def gen_task_hash(conn, task_name, task_args):
     """
     generate unique hash string for a single mysql write task
@@ -664,7 +553,7 @@ def import_obj(obj_path, hard=False):
         <function main at x>
 
     :param obj_path: a string represents the object uri.
-    ;param hard: a boolean value indicates whether to raise an exception on
+    :param hard: a boolean value indicates whether to raise an exception on
                 import failures.
     """
     try:
@@ -776,3 +665,29 @@ def function_key_generator(namespace, func, to_str=True, **kwargs):
         args = tuple(map(unicode_to_str, args))
         tuples = sorted(map(pair_to_str, kw.iteritems()))
         return "{}|{}{}".format(namespace, args, tuples)
+
+
+def load_obj(import_path):
+    parts = import_path.split(":", 1)
+    if len(parts) == 1:
+        raise ValueError("Wrong import path, module:obj please")
+
+    module, obj = parts[0], parts[1]
+
+    try:
+        mod = importlib.import_module(module)
+    except ImportError:
+        if module.endswith(".py") and os.path.exists(module):
+            raise ImportError(
+                "Failed to find application, did "
+                "you mean '%s:%s'?" % (module.rsplit(".", 1)[0], obj)
+            )
+        else:
+            raise
+
+    try:
+        app = getattr(mod, obj)
+    except AttributeError:
+        raise AppImportError("Failed to find application object: %r" % obj)
+
+    return app
